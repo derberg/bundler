@@ -1,98 +1,73 @@
 import $RefParser from '@apidevtools/json-schema-ref-parser';
-import { JSONPath } from 'jsonpath-plus';
-import { merge } from 'lodash';
 
-import type { $Refs } from '@apidevtools/json-schema-ref-parser';
-import type { AsyncAPIObject, ComponentsObject, MessageObject } from './spec-types';
+import type { ParserOptions as $RefParserOptions } from '@apidevtools/json-schema-ref-parser';
+import type { AsyncAPIObject, Options as BundlerOptions } from './spec-types';
 
-/**
- * @class
- * @private
- */
-class ExternalComponents {
-  ref;
-  resolvedJSON;
-  constructor(ref: string, resolvedJSON: string) {
-    this.ref = ref;
-    this.resolvedJSON = resolvedJSON;
-  }
-
-  getKey() {
-    const keys = this.ref.split('/');
-    return keys[keys.length - 1];
-  }
-
-  getValue() {
-    return this.resolvedJSON;
-  }
-}
+let RefParserOptions: $RefParserOptions;
 
 /**
- * @private
- */
-function crawlChannelPropertiesForRefs(JSONSchema: AsyncAPIObject) {
-  // eslint-disable-next-line
-  return JSONPath({ json: JSONSchema, path: `$.channels.*.*.message['$ref']` });
-}
-
-/**
- * Checks if `ref` is an external reference.
- * @param {string} ref
- * @returns {boolean}
- * @private
- */
-export function isExternalReference(ref: string): boolean {
-  return typeof ref === 'string' && !ref.startsWith('#');
-}
-
-/**
- *
- * @param {Object[]} parsedJSON
- * @param {$RefParser} $refs
- * @returns {ExternalComponents}
- * @private
- */
-async function resolveExternalRefs(parsedJSON: AsyncAPIObject, $refs: $Refs) {
-  const componentObj: ComponentsObject = { messages: {} };
-  JSONPath({
-    json: parsedJSON,
-    resultType: 'all',
-    path: '$.channels.*.*.message',
-  }).forEach(
-    ({ parent, parentProperty }: { parent: any; parentProperty: string }) => {
-      const ref = parent[String(parentProperty)]['$ref'];
-      if (isExternalReference(ref)) {
-        const value: any = $refs.get(ref);
-        const component = new ExternalComponents(ref, value);
-        if (componentObj.messages) {
-          componentObj.messages[String(component.getKey())] =
-            component.getValue() as unknown as MessageObject;
-        }
-        parent[String(parentProperty)][
-          '$ref'
-        ] = `#/components/messages/${component.getKey()}`;
-      }
-    }
-  );
-  return componentObj;
-}
-
-/**
- * Resolves external references and updates $refs.
+ * Function fully dereferences the provided AsyncAPI Document.
  * @param {Object[]} JSONSchema
+ * @param {number} specVersion
+ * @param {Object} options
  * @private
  */
-export async function parse(JSONSchema: AsyncAPIObject) {
-  const $ref: any = await $RefParser.resolve(JSONSchema);
-  const refs = crawlChannelPropertiesForRefs(JSONSchema);
-  for (const ref of refs) {
-    if (isExternalReference(ref)) {
-      const componentObject = await resolveExternalRefs(JSONSchema, $ref);
-      if (JSONSchema.components) {
-        merge(JSONSchema.components, componentObject);
-      } else {
-        JSONSchema.components = componentObject;
-      }
-    }
+export async function parse(
+  JSONSchema: AsyncAPIObject,
+  specVersion: number,
+  options: BundlerOptions = {}
+) {
+  /* eslint-disable indent */
+  // It is assumed that there will be major Spec versions 4, 5 and on.
+  switch (specVersion) {
+    case 2:
+      RefParserOptions = {
+        dereference: {
+          circular: false,
+          // prettier-ignore
+          excludedPathMatcher: (path: string): any => { // eslint-disable-line
+            return;
+          },
+          onDereference: (path: string, value: AsyncAPIObject) => {
+            if (options.xOrigin === true) {
+              value['x-origin'] = path;
+            }
+          },
+        },
+      };
+      break;
+    case 3:
+      RefParserOptions = {
+        dereference: {
+          circular: false,
+          excludedPathMatcher: (path: string): any => {
+            return (
+              // prettier-ignore
+              (/#\/channels\/.*\/servers/).test(path) ||
+              (/#\/operations\/.*\/channel/).test(path) ||
+              (/#\/operations\/.*\/messages/).test(path) ||
+              (/#\/operations\/.*\/reply\/channel/).test(path) ||
+              (/#\/operations\/.*\/reply\/messages/).test(path) ||
+              (/#\/components\/channels\/.*\/servers/).test(path) ||
+              (/#\/components\/operations\/.*\/channel/).test(path) ||
+              (/#\/components\/operations\/.*\/messages/).test(path) ||
+              (/#\/components\/operations\/.*\/reply\/channel/).test(path) ||
+              (/#\/components\/operations\/.*\/reply\/messages/).test(path)
+            );
+          },
+          onDereference: (path: string, value: AsyncAPIObject) => {
+            if (options.xOrigin === true) {
+              value['x-origin'] = path;
+            }
+          },
+        },
+      };
+      break;
+    default:
+      console.error(
+        `There is no support for AsyncAPI Specification v${specVersion}.`
+      );
   }
+
+  return await $RefParser.dereference(JSONSchema, RefParserOptions) as AsyncAPIObject;
 }

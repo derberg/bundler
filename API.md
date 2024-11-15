@@ -18,23 +18,22 @@
 **Kind**: global class  
 
 * [Document](#Document)
-    * [new Document(parsedJSONList, base)](#new_Document_new)
+    * [new Document(AsyncAPIObject)](#new_Document_new)
     * [.json()](#Document+json) ⇒ <code>Object</code>
     * [.yml()](#Document+yml) ⇒ <code>string</code>
     * [.string()](#Document+string) ⇒ <code>string</code>
 
 <a name="new_Document_new"></a>
 
-### new Document(parsedJSONList, base)
+### new Document(AsyncAPIObject)
 
 | Param | Type |
 | --- | --- |
-| parsedJSONList | <code>Array.&lt;Object&gt;</code> | 
-| base | <code>Object</code> | 
+| AsyncAPIObject | <code>Object</code> | 
 
 **Example**  
 ```js
-const document = new Document(parsedJSONList, base);
+const document = new Document(bundledDocument);
 
 console.log(document.json()); // get JSON object
 console.log(document.yml()); // get YAML string
@@ -59,24 +58,26 @@ console.log(document.string()); // get JSON string
 
 | Param | Type | Description |
 | --- | --- | --- |
-| files | <code>Array.&lt;string&gt;</code> | <p>Array of stringified AsyncAPI documents in YAML format, that are to be bundled (or array of filepaths, resolved and passed via <code>Array.map()</code> and <code>fs.readFileSync</code>, which is the same, see <code>README.md</code>).</p> |
+| files | <code>string</code> \| <code>Array.&lt;string&gt;</code> | <p>One or more relative/absolute paths to AsyncAPI Documents that should be bundled.</p> |
 | [options] | <code>Object</code> |  |
-| [options.base] | <code>string</code> \| <code>object</code> | <p>Base object whose properties will be retained.</p> |
-| [options.referenceIntoComponents] | <code>boolean</code> | <p>Pass <code>true</code> to resolve external references to components.</p> |
+| [options.base] | <code>string</code> | <p>One relative/absolute path to base object whose properties will be retained.</p> |
+| [options.baseDir] | <code>string</code> | <p>One relative/absolute path to directory relative to which paths to AsyncAPI Documents that should be bundled will be resolved.</p> |
+| [options.xOrigin] | <code>boolean</code> | <p>Pass <code>true</code> to generate properties <code>x-origin</code> that will contain historical values of dereferenced <code>$ref</code>s.</p> |
 
 **Example**  
 **TypeScript**
 ```ts
-import { readFileSync, writeFileSync } from 'fs';
+import { writeFileSync } from 'fs';
 import bundle from '@asyncapi/bundler';
 
 async function main() {
-  const document = await bundle([readFileSync('./main.yaml', 'utf-8')], {
-    referenceIntoComponents: true,
-  });
+ const document = await bundle(['social-media/comments-service/main.yaml'], {
+   baseDir: 'example-data',
+   xOrigin: true,
+ });
 
-  console.log(document.yml()); // the complete bundled AsyncAPI document
-  writeFileSync('asyncapi.yaml', document.yml());  // the complete bundled AsyncAPI document
+ console.log(document.yml()); // the complete bundled AsyncAPI document
+ writeFileSync('asyncapi.yaml', document.yml());  // the complete bundled AsyncAPI document
 }
 
 main().catch(e => console.error(e));
@@ -86,14 +87,15 @@ main().catch(e => console.error(e));
 ```js
 'use strict';
 
-const { readFileSync, writeFileSync } = require('fs');
+const { writeFileSync } = require('fs');
 const bundle = require('@asyncapi/bundler');
 
 async function main() {
-  const document = await bundle([readFileSync('./main.yaml', 'utf-8')], {
-    referenceIntoComponents: true,
-  });
-  writeFileSync('asyncapi.yaml', document.yml());
+ const document = await bundle(['social-media/comments-service/main.yaml'], {
+   baseDir: 'example-data',
+   xOrigin: true,
+ });
+ writeFileSync('asyncapi.yaml', document.yml());
 }
 
 main().catch(e => console.error(e));
@@ -103,15 +105,16 @@ main().catch(e => console.error(e));
 ```js
 'use strict';
 
-import { readFileSync, writeFileSync } from 'fs';
+import { writeFileSync } from 'fs';
 import bundle from '@asyncapi/bundler';
 
 async function main() {
-  const document = await bundle([readFileSync('./main.yaml', 'utf-8')], {
-    referenceIntoComponents: true,
-  });
-  writeFileSync('asyncapi.yaml', document.yml());
+ const document = await bundle(['social-media/comments-service/main.yaml'], {
+   baseDir: 'example-data',
+   xOrigin: true,
+ });
+ writeFileSync('asyncapi.yaml', document.yml());
 }
 
-main().catch(e => console.error(e)); 
+main().catch(e => console.error(e));
 ```
